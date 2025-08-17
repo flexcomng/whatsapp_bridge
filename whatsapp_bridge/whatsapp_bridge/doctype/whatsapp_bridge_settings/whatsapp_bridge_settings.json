@@ -1,0 +1,79 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-08-17 03:32:12.246405",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "bridge_url",
+  "bridge_token",
+  "bind_host",
+  "column_break_rqvj",
+  "tenant_id",
+  "default_country",
+  "expose_port"
+ ],
+ "fields": [
+  {
+   "fieldname": "bridge_url",
+   "fieldtype": "Data",
+   "label": "Bridge URL"
+  },
+  {
+   "fieldname": "bridge_token",
+   "fieldtype": "Password",
+   "label": "Bridge Token"
+  },
+  {
+   "fieldname": "column_break_rqvj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tenant_id",
+   "fieldtype": "Data",
+   "label": "Tenant ID"
+  },
+  {
+   "fieldname": "default_country",
+   "fieldtype": "Data",
+   "label": "Default Country"
+  },
+  {
+   "default": "127.0.0.1",
+   "fieldname": "bind_host",
+   "fieldtype": "Data",
+   "label": "Bind Host"
+  },
+  {
+   "default": "3001",
+   "fieldname": "expose_port",
+   "fieldtype": "Int",
+   "label": "Expose Port"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-08-17 14:15:22.983090",
+ "modified_by": "Administrator",
+ "module": "WhatsApp Bridge",
+ "name": "WhatsApp Bridge Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

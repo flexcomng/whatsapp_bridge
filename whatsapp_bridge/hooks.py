@@ -31,7 +31,10 @@ app_license = "agpl-3.0"
 # include js, css files in header of web template
 # web_include_css = "/assets/whatsapp_bridge/css/whatsapp_bridge.css"
 # web_include_js = "/assets/whatsapp_bridge/js/whatsapp_bridge.js"
-
+website_route_rules = [
+    {"from_route": "/whatsapp-bridge/qr", "to_route": "whatsapp-bridge/qr"},
+    {"from_route": "/whatsapp-bridge/status", "to_route": "whatsapp-bridge/status"},
+]
 # include custom scss in every website theme (without file extension ".scss")
 # website_theme_scss = "whatsapp_bridge/public/scss/website"
 
@@ -83,7 +86,7 @@ app_license = "agpl-3.0"
 # ------------
 
 # before_install = "whatsapp_bridge.install.before_install"
-# after_install = "whatsapp_bridge.install.after_install"
+after_install = "whatsapp_bridge.after_install.run_after_install"
 
 # Uninstallation
 # ------------
@@ -137,13 +140,13 @@ app_license = "agpl-3.0"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+    "Sales Invoice": {
+        "on_submit": [
+            "whatsapp_bridge.whatsapp_bridge.doctype.whatsapp_bridge_settings.whatsapp_bridge_settings.on_submit_sales_invoice"
+        ],
+    }
+}
 
 # Scheduled Tasks
 # ---------------

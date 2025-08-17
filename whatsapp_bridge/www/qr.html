@@ -1,0 +1,12 @@
+{% extends "templates/web.html" %}
+{% block page_content %}
+  <div class="container" style="max-width:640px; margin-top:24px">
+    <h3>WhatsApp Bridge — {{ tenant }}</h3>
+    <p>{{ message }}</p>
+    {% if not client_ready %}
+      <div style="border:1px solid #eee; padding:16px; border-radius:8px; background:#fff">
+        {{ qr_html | safe }}
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

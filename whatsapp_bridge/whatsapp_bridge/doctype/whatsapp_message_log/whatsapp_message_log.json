@@ -1,0 +1,109 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-08-17 14:24:37.163846",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "tenant_id",
+  "doctype_name",
+  "to_number",
+  "message_peview",
+  "column_break_fmef",
+  "has_media",
+  "bridge_corr_id",
+  "bridge_msg_ids",
+  "sent_on",
+  "status",
+  "section_break_pkze",
+  "error"
+ ],
+ "fields": [
+  {
+   "fieldname": "tenant_id",
+   "fieldtype": "Data",
+   "label": "Tenant ID"
+  },
+  {
+   "fieldname": "doctype_name",
+   "fieldtype": "Data",
+   "label": "Doctype Name"
+  },
+  {
+   "fieldname": "to_number",
+   "fieldtype": "Data",
+   "label": "To Number"
+  },
+  {
+   "fieldname": "message_peview",
+   "fieldtype": "Small Text",
+   "label": "Message Peview"
+  },
+  {
+   "default": "0",
+   "fieldname": "has_media",
+   "fieldtype": "Check",
+   "label": "Has Media"
+  },
+  {
+   "fieldname": "bridge_corr_id",
+   "fieldtype": "Data",
+   "label": "Bridge Corr ID"
+  },
+  {
+   "fieldname": "bridge_msg_ids",
+   "fieldtype": "Small Text",
+   "label": "Bridge Msg IDs"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Pending\nSuccess\nFailed"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error"
+  },
+  {
+   "fieldname": "sent_on",
+   "fieldtype": "Datetime",
+   "label": "Sent On"
+  },
+  {
+   "fieldname": "column_break_fmef",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_pkze",
+   "fieldtype": "Section Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-08-17 14:28:23.207034",
+ "modified_by": "Administrator",
+ "module": "WhatsApp Bridge",
+ "name": "WhatsApp Message Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

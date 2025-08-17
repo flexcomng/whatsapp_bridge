@@ -1,0 +1,7 @@
+{% extends "templates/web.html" %}
+{% block page_content %}
+  <div class="container" style="max-width:640px; margin-top:24px">
+    <h3>WhatsApp Bridge Status</h3>
+    <pre style="white-space:pre-wrap">{{ status | tojson(indent=2) }}</pre>
+  </div>
+{% endblock %}
