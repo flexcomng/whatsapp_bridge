@@ -1,0 +1,22 @@
+[
+  {
+    "doctype": "Custom Field",
+    "dt": "Notification",
+    "fieldname": "send_via_whatsapp",
+    "name": "Notification-send_via_whatsapp",
+    "label": "Send via WhatsApp",
+    "fieldtype": "Check",
+    "insert_after": "message",
+    "print_hide": 1
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Notification",
+    "fieldname": "whatsapp_to_expr",
+    "name": "Notification-whatsapp_to_expr",
+    "label": "WhatsApp To (Jinja)",
+    "fieldtype": "Data",
+    "insert_after": "send_via_whatsapp",
+    "description": "Optional Jinja that resolves to a phone number, e.g. {{ doc.contact_mobile or doc.mobile_no or frappe.db.get_value('Customer', doc.customer, 'mobile_no') }}"
+  }
+]

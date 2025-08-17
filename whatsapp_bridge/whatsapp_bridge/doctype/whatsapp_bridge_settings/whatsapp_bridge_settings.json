@@ -11,7 +11,14 @@
   "column_break_rqvj",
   "tenant_id",
   "default_country",
-  "expose_port"
+  "expose_port",
+  "trust_proxy",
+  "section_break_wkuw",
+  "allowed_ips",
+  "column_break_sjlc",
+  "allowed_cidrs",
+  "column_break_edjr",
+  "allowed_hostss"
  ],
  "fields": [
   {
@@ -49,13 +56,46 @@
    "fieldname": "expose_port",
    "fieldtype": "Int",
    "label": "Expose Port"
+  },
+  {
+   "fieldname": "allowed_ips",
+   "fieldtype": "Small Text",
+   "label": "Allowed IPs"
+  },
+  {
+   "fieldname": "allowed_cidrs",
+   "fieldtype": "Small Text",
+   "label": "Allowed CIDRs"
+  },
+  {
+   "fieldname": "allowed_hostss",
+   "fieldtype": "Small Text",
+   "label": "Allowed Hostss"
+  },
+  {
+   "default": "0",
+   "fieldname": "trust_proxy",
+   "fieldtype": "Check",
+   "label": "Trust Proxy"
+  },
+  {
+   "fieldname": "section_break_wkuw",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_sjlc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_edjr",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-08-17 14:15:22.983090",
+ "modified": "2025-08-17 15:54:21.433660",
  "modified_by": "Administrator",
  "module": "WhatsApp Bridge",
  "name": "WhatsApp Bridge Settings",

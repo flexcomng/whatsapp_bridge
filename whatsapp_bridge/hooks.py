@@ -141,10 +141,11 @@ after_install = "whatsapp_bridge.after_install.run_after_install"
 # Hook on document methods and events
 
 doc_events = {
-    "Sales Invoice": {
-        "on_submit": [
-            "whatsapp_bridge.whatsapp_bridge.doctype.whatsapp_bridge_settings.whatsapp_bridge_settings.on_submit_sales_invoice"
-        ],
+    "*": {
+        "after_insert": "whatsapp_bridge.config.notify.handle_event",
+        "on_update":    "whatsapp_bridge.config.notify.handle_event",
+        "on_submit":    "whatsapp_bridge.config.notify.handle_event",
+        "on_cancel":    "whatsapp_bridge.config.notify.handle_event",
     }
 }
 
