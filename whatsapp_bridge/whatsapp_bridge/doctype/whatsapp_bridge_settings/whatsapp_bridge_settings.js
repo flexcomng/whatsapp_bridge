@@ -43,13 +43,15 @@ frappe.ui.form.on('WhatsApp Bridge Settings', {
         frappe.msgprint(__('Rotation failed'));
       }
     });
-
-    frm.add_custom_button('Open QR (via proxy)', () => {
-      // Works if you've added the /wa-bridge/ reverse-proxy location in nginx
+    frm.add_custom_button('Open QR (via port 3001)', () => {
       const tenant = frm.doc.tenant_id || '';
-      const token = frm.doc.bridge_token || '';
-      const url = `/wa-bridge/qr?tenant=${encodeURIComponent(tenant)}&token=${encodeURIComponent(token)}`;
-      window.open(url, '_blank');
+      const token  = frm.doc.bridge_token || '';
+
+      // Bridge vhost listens on HTTPS :3001 (SNI), same hostname as the site
+      const host = window.location.hostname;
+      const url  = `https://${host}:3001/qr?tenant=${encodeURIComponent(tenant)}&token=${encodeURIComponent(token)}`;
+
+      window.open(url, '_blank', 'noopener');
     });
   }
 });

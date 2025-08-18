@@ -27,11 +27,13 @@
   {
    "fieldname": "doctype_name",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Doctype Name"
   },
   {
    "fieldname": "to_number",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "To Number"
   },
   {
@@ -58,6 +60,8 @@
   {
    "fieldname": "status",
    "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Status",
    "options": "Pending\nSuccess\nFailed"
   },
@@ -69,6 +73,7 @@
   {
    "fieldname": "sent_on",
    "fieldtype": "Datetime",
+   "in_list_view": 1,
    "label": "Sent On"
   },
   {
@@ -83,7 +88,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-08-17 14:28:23.207034",
+ "modified": "2025-08-18 02:14:03.656573",
  "modified_by": "Administrator",
  "module": "WhatsApp Bridge",
  "name": "WhatsApp Message Log",

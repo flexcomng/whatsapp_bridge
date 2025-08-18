@@ -12,19 +12,14 @@
   "tenant_id",
   "default_country",
   "expose_port",
-  "trust_proxy",
-  "section_break_wkuw",
-  "allowed_ips",
-  "column_break_sjlc",
-  "allowed_cidrs",
-  "column_break_edjr",
-  "allowed_hostss"
+  "trust_proxy"
  ],
  "fields": [
   {
    "fieldname": "bridge_url",
    "fieldtype": "Data",
-   "label": "Bridge URL"
+   "label": "Bridge URL",
+   "read_only": 1
   },
   {
    "fieldname": "bridge_token",
@@ -38,64 +33,41 @@
   {
    "fieldname": "tenant_id",
    "fieldtype": "Data",
-   "label": "Tenant ID"
+   "label": "Tenant ID",
+   "read_only": 1
   },
   {
    "fieldname": "default_country",
    "fieldtype": "Data",
-   "label": "Default Country"
+   "label": "Default Country",
+   "read_only": 1
   },
   {
    "default": "127.0.0.1",
    "fieldname": "bind_host",
    "fieldtype": "Data",
-   "label": "Bind Host"
+   "label": "Bind Host",
+   "read_only": 1
   },
   {
    "default": "3001",
    "fieldname": "expose_port",
    "fieldtype": "Int",
-   "label": "Expose Port"
-  },
-  {
-   "fieldname": "allowed_ips",
-   "fieldtype": "Small Text",
-   "label": "Allowed IPs"
-  },
-  {
-   "fieldname": "allowed_cidrs",
-   "fieldtype": "Small Text",
-   "label": "Allowed CIDRs"
-  },
-  {
-   "fieldname": "allowed_hostss",
-   "fieldtype": "Small Text",
-   "label": "Allowed Hostss"
+   "label": "Expose Port",
+   "read_only": 1
   },
   {
    "default": "0",
    "fieldname": "trust_proxy",
    "fieldtype": "Check",
    "label": "Trust Proxy"
-  },
-  {
-   "fieldname": "section_break_wkuw",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "column_break_sjlc",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "column_break_edjr",
-   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-08-17 15:54:21.433660",
+ "modified": "2025-08-18 02:12:19.108790",
  "modified_by": "Administrator",
  "module": "WhatsApp Bridge",
  "name": "WhatsApp Bridge Settings",
