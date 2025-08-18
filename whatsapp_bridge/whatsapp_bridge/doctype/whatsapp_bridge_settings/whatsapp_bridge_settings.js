@@ -43,7 +43,8 @@ frappe.ui.form.on('WhatsApp Bridge Settings', {
         frappe.msgprint(__('Rotation failed'));
       }
     });
-    frm.add_custom_button('Open QR (via port 3001)', () => {
+
+    frm.add_custom_button('Open QR', () => {
       const tenant = frm.doc.tenant_id || '';
       const token  = frm.doc.bridge_token || '';
 
