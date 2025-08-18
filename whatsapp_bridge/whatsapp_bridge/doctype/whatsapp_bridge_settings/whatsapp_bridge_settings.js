@@ -13,15 +13,15 @@ frappe.ui.form.on('WhatsApp Bridge Settings', {
       }
     });
 
-    frm.add_custom_button('Apply & Restart', async () => {
-      try {
-        frappe.show_alert({ message: __('Applying…'), indicator: 'orange' });
-        const r = await frappe.call({ method: 'whatsapp_bridge.api.api.apply_settings' });
-        frappe.msgprint(__('Bridge applied & restarted.'));
-      } catch {
-        frappe.msgprint(__('Apply failed'));
-      }
-    });
+    // frm.add_custom_button('Apply & Restart', async () => {
+    //   try {
+    //     frappe.show_alert({ message: __('Applying…'), indicator: 'orange' });
+    //     const r = await frappe.call({ method: 'whatsapp_bridge.api.api.apply_settings' });
+    //     frappe.msgprint(__('Bridge applied & restarted.'));
+    //   } catch {
+    //     frappe.msgprint(__('Apply failed'));
+    //   }
+    // });
     if (!frm.is_new()) {
       frm.add_custom_button('Restart Bridge', async () => {
         try {
