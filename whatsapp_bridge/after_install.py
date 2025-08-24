@@ -1,5 +1,5 @@
 # whatsapp_bridge/after_install.py
-# Frappe v15-compatible: per-site WhatsApp Bridge installer
+# Frappe v15-compatible: per-site WhatsApp Bridge installer (matches latest index.js)
 from __future__ import annotations
 
 import os
@@ -10,7 +10,6 @@ import secrets
 import getpass
 import socket
 import subprocess
-import string
 from pathlib import Path
 import grp
 import frappe
@@ -18,7 +17,7 @@ import frappe
 # =============================
 # Defaults / constants
 # =============================
-DEFAULT_BIND_HOST = "127.0.0.1"   # container binds loopback only
+DEFAULT_BIND_HOST = "127.0.0.1"   # container binds loopback only; public via Nginx
 DEFAULT_PORT = 13001              # initial host port -> container:3001
 DEFAULT_TENANT_ID = "sales"
 DEFAULT_COUNTRY = "Nigeria"
@@ -231,7 +230,7 @@ CMD ["node", "index.js"]
 def _package_json() -> str:
     return """{
   "name": "whatsapp-bridge",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "private": true,
   "type": "module",
   "scripts": { "start": "node index.js" },
@@ -250,6 +249,7 @@ def _package_json() -> str:
 """
 
 def _index_js() -> str:
+    # IMPORTANT: no backtick template literals inside to avoid paste/quote breakage
     return r"""import 'dotenv/config';
 import express from 'express';
 import helmet from 'helmet';
@@ -259,78 +259,47 @@ import winston from 'winston';
 import { v4 as uuidv4 } from 'uuid';
 import pkg from 'whatsapp-web.js';
 import ipaddr from 'ipaddr.js';
+import fs from 'fs/promises';
+import path from 'path';
+
 const { Client, LocalAuth, MessageMedia } = pkg;
 
+// ---------------- env ----------------
 const PORT = process.env.PORT || 3001;
 const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
-const CHROMIUM_PATH = process.env.CHRONIUM_PATH || process.env.CHROMIUM_PATH || undefined;
+const CHROMIUM_PATH =
+  process.env.CHRONIUM_PATH || process.env.CHROMIUM_PATH || undefined; // tolerate both
 const TENANT_TOKENS = String(process.env.TENANT_TOKENS || '').trim();
 
 const RAW_ALLOW_IPS   = (process.env.ALLOW_IPS   || '').trim();
 const RAW_ALLOW_CIDRS = (process.env.ALLOW_CIDRS || '').trim();
 const RAW_ALLOW_HOSTS = (process.env.ALLOW_HOSTS || '').trim();
-const TRUST_PROXY = (process.env.TRUST_PROXY || '0') === '1';
 
-const allowIPs   = RAW_ALLOW_IPS   ? RAW_ALLOW_IPS.split(',').map(s => s.trim()).filter(Boolean) : [];
-const allowCIDRs = RAW_ALLOW_CIDRS ? RAW_ALLOW_CIDRS.split(',').map(s => s.trim()).filter(Boolean) : [];
-const allowHosts = RAW_ALLOW_HOSTS ? RAW_ALLOW_HOSTS.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
-
+// ---------------- logger ----------------
 const logger = winston.createLogger({
   level: LOG_LEVEL,
   transports: [new winston.transports.Console({ format: winston.format.simple() })],
 });
 
+// ---------------- tenants ----------------
 if (!TENANT_TOKENS) {
   logger.error('No tenants in TENANT_TOKENS');
   process.exit(1);
 }
-
 const tenantTokens = {};
 TENANT_TOKENS.split(',').forEach(pair => {
-  const [tenant, token] = pair.split(':').map(s => s.trim());
-  if (tenant && token) tenantTokens[tenant] = token;
+  const parts = pair.split(':');
+  if (parts.length >= 2) {
+    const tenant = String(parts[0] || '').trim();
+    const token  = String(parts.slice(1).join(':') || '').trim(); // tolerate ':' in token
+    if (tenant && token) tenantTokens[tenant] = token;
+  }
 });
 
-const clients = {};
-const qrCache = {};
-const readyState = {};
-
-function getOrCreateClient(tenant) {
-  if (clients[tenant]) return clients[tenant];
-  const client = new Client({
-    puppeteer: {
-      headless: true,
-      executablePath: CHROMIUM_PATH,
-      args: ['--no-sandbox','--disable-setuid-sandbox']
-    },
-    authStrategy: new LocalAuth({ clientId: `erpnext-bridge-${tenant}` })
-  });
-  readyState[tenant] = false;
-  qrCache[tenant] = null;
-  client.on('qr', async (qr) => {
-    qrCache[tenant] = await QRCode.toDataURL(qr);
-    logger.info(`[${tenant}] QR ready`);
-  });
-  client.on('ready', () => {
-    readyState[tenant] = true;
-    qrCache[tenant] = null;
-    logger.info(`[${tenant}] READY`);
-  });
-  client.on('disconnected', (reason) => {
-    readyState[tenant] = false;
-    logger.warn(`[${tenant}] Disconnected: ${reason}`);
-  });
-  client.initialize();
-  clients[tenant] = client;
-  return client;
-}
-
-const app = express();
-if (TRUST_PROXY) app.set('trust proxy', true);
-
-app.use(helmet());
-app.use(express.json({ limit: '25mb' }));
-app.use(rateLimit({ windowMs: 60000, max: 240 }));
+// ---------------- allow-lists ----------------
+const allowIPs   = RAW_ALLOW_IPS   ? RAW_ALLOW_IPS.split(',').map(s => s.trim()).filter(Boolean) : [];
+const allowCIDRs = RAW_ALLOW_CIDRS ? RAW_ALLOW_CIDRS.split(',').map(s => s.trim()).filter(Boolean) : [];
+const allowHosts = RAW_ALLOW_HOSTS ? RAW_ALLOW_HOSTS.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
 
 function ipAllowed(ip) {
   if (!allowIPs.length && !allowCIDRs.length) return true;
@@ -339,16 +308,125 @@ function ipAllowed(ip) {
     if (allowIPs.includes(clean)) return true;
     const addr = ipaddr.parse(clean);
     for (const block of allowCIDRs) {
-      const [range, prefixStr] = block.split('/');
-      const rng = ipaddr.parse(range);
-      if (rng.kind() !== addr.kind()) continue;
-      if (addr.match([rng, parseInt(prefixStr, 10)])) return true;
+      const [rangeStr, prefixStr] = block.split('/');
+      const range = ipaddr.parse(rangeStr);
+      const prefix = parseInt(prefixStr || '0', 10);
+      if (range.kind() !== addr.kind()) continue;
+      if (addr.match([range, prefix])) return true;
     }
-  } catch (e) {}
+  } catch {}
   return false;
 }
 
-// Network allow-lists
+// ---------------- client state ----------------
+const clients = {};
+const qrCache = {};      // data URL | null
+const readyState = {};   // boolean
+
+function sessionDirFor(tenant) {
+  return path.join('/app/.wwebjs_auth', 'session-erpnext-bridge-' + tenant);
+}
+
+async function cleanChromeLocks(tenant) {
+  const dir = sessionDirFor(tenant);
+  const candidates = ['SingletonLock', 'SingletonCookie', 'lockfile'];
+  for (const f of candidates) {
+    try { await fs.rm(path.join(dir, f), { force: true }); } catch {}
+  }
+}
+
+async function destroyClient(tenant, { wipe = false } = {}) {
+  const c = clients[tenant];
+  try { if (c) await c.destroy(); } catch (e) { logger.warn('[' + tenant + '] destroy error: ' + e); }
+  if (wipe) {
+    try { await fs.rm(sessionDirFor(tenant), { recursive: true, force: true }); }
+    catch (e) { logger.warn('[' + tenant + '] session wipe failed: ' + e); }
+  }
+  delete clients[tenant];
+  readyState[tenant] = false;
+  qrCache[tenant] = null;
+}
+
+async function makeClient(tenant) {
+  await cleanChromeLocks(tenant);
+
+  const client = new Client({
+    puppeteer: {
+      headless: true,
+      executablePath: CHROMIUM_PATH,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--no-zygote',
+        '--disable-gpu',
+      ],
+    },
+    authStrategy: new LocalAuth({ clientId: 'erpnext-bridge-' + tenant })
+  });
+
+  readyState[tenant] = false;
+  qrCache[tenant] = null;
+
+  client.on('qr', async (qr) => {
+    try {
+      qrCache[tenant] = await QRCode.toDataURL(qr);
+      readyState[tenant] = false;
+      logger.info('[' + tenant + '] QR ready');
+    } catch (e) {
+      logger.warn('[' + tenant + '] QR encode failed: ' + e);
+    }
+  });
+
+  client.on('ready', () => {
+    readyState[tenant] = true;
+    qrCache[tenant] = null;
+    logger.info('[' + tenant + '] READY');
+  });
+
+  client.on('auth_failure', (m) => {
+    readyState[tenant] = false;
+    logger.warn('[' + tenant + '] auth failure: ' + (m || ''));
+  });
+
+  client.on('disconnected', (reason) => {
+    readyState[tenant] = false;
+    logger.warn('[' + tenant + '] Disconnected: ' + reason);
+  });
+
+  client.initialize();
+  clients[tenant] = client;
+  return client;
+}
+
+function getOrCreateClient(tenant) {
+  return clients[tenant] || (makeClient(tenant), clients[tenant]);
+}
+
+// safety
+process.on('unhandledRejection', (err) => {
+  logger.warn('unhandledRejection: ' + (err && err.stack || err));
+});
+process.on('uncaughtException', (err) => {
+  logger.error('uncaughtException: ' + (err && err.stack || err));
+});
+
+// ---------------- app ----------------
+const app = express();
+
+// behind nginx on loopback
+app.set('trust proxy', 'loopback');
+
+app.use(helmet({ contentSecurityPolicy: false }));
+
+app.use(rateLimit({
+  windowMs: 60_000,
+  max: 240,
+}));
+
+app.use(express.json({ limit: '25mb' }));
+
+// network allow-lists + host allow-list
 app.use((req, res, next) => {
   const ip = (req.ip || req.socket?.remoteAddress || '').replace(/^::ffff:/, '');
   const host = String(req.headers.host || '').toLowerCase();
@@ -357,58 +435,120 @@ app.use((req, res, next) => {
   next();
 });
 
-// Auth: Bearer token; allow ?token= for browser GETs to /qr|/status|/health
+// Bearer auth; allow ?token= for browser GETs to qr/status/health/qr-img.png
 app.use((req, res, next) => {
-  const isBrowserGet = req.method === 'GET' && ['/qr','/status','/health'].includes(req.path);
-  const tenant = (req.query.tenant || req.body.tenant || req.headers['x-tenant'] || '').toString().trim();
+  const isBrowserGet = req.method === 'GET' && ['/qr','/status','/health','/qr-img','/qr-img.png','/reinit'].includes(req.path);
+  const tenant = String(req.query.tenant || req.body.tenant || req.headers['x-tenant'] || '').trim();
   let token = '';
   const auth = req.headers.authorization || '';
   if (auth.startsWith('Bearer ')) token = auth.slice(7);
-  if (!token && isBrowserGet) token = (req.query.token || '').toString().trim();
+  if (!token && isBrowserGet) token = String(req.query.token || '').trim();
 
   if (!tenant || !(tenant in tenantTokens)) return res.status(400).json({ error: 'Invalid or missing tenant' });
-  if (tenantTokens[tenant] !== token) return res.status(401).send('Unauthorized');
+  if (tenantTokens[tenant] != token) return res.status(401).send('Unauthorized');
 
   req.tenant = tenant;
   req.client = getOrCreateClient(tenant);
   next();
 });
 
+// -------- endpoints --------
 app.get('/health', (req, res) => {
   res.json({ ok: true, tenant: req.tenant, clientReady: !!readyState[req.tenant] });
 });
+
 app.get('/status', (req, res) => {
   res.json({ tenant: req.tenant, clientReady: !!readyState[req.tenant], lastQr: !!qrCache[req.tenant] });
 });
 
-app.get('/qr', (req, res) => {
+// PNG stream of current QR (204 if none)
+app.get('/qr-img.png', (req, res) => {
+  const img = qrCache[req.tenant];
+  if (!img) return res.status(204).end();
+  const b64 = (img.split(',')[1] || '');
+  const buf = Buffer.from(b64, 'base64');
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Cache-Control', 'no-store');
+  res.end(buf);
+});
+
+// legacy: return JSON {dataUrl}, 204 if none (kept for compatibility)
+app.get('/qr-img', (req, res) => {
+  const img = qrCache[req.tenant];
+  if (!img) return res.status(204).end();
+  res.json({ dataUrl: img });
+});
+
+// reinit (GET/POST), add ?wipe=1 to drop session and force new pair
+async function doReinit(req, res) {
+  const tenant = req.tenant;
+  const wipe = (String(req.query.wipe || req.body?.wipe || '') === '1' ||
+                String(req.query.wipe || req.body?.wipe || '').toLowerCase() === 'true');
+  await destroyClient(tenant, { wipe });
+  await cleanChromeLocks(tenant);
+  await makeClient(tenant);
+  res.json({ ok: true, tenant, reset: true, wipe });
+}
+app.post('/reinit', doReinit);
+app.get('/reinit', doReinit);
+
+// QR page (supports &force=1&wipe=1)
+app.get('/qr', async (req, res) => {
   const t = req.tenant;
-  const token = (req.query.token || '').toString().trim();
-  const img = qrCache[t];
-  res.setHeader('Content-Type', 'text/html');
-  res.end(`
-<html><body style="font-family: sans-serif">
-  <h3>Scan with WhatsApp (${t})</h3>
-  ${img ? `<img src="${img}" />` : `<p>No QR available. Client may already be ready.</p>`}
-  <script>
-    const token=${JSON.stringify(token)}, tenant=${JSON.stringify(t)};
-    async function poll(){
-      try{
-        const r=await fetch('/status?tenant='+encodeURIComponent(tenant)+'&token='+encodeURIComponent(token));
-        const d=await r.json();
-        if(d.clientReady){ document.body.innerHTML='<h3>WhatsApp instance activated.</h3>'; return; }
-      }catch(e){}
-      setTimeout(poll,1500);
-    }
-    poll();
-  </script>
-</body></html>`);
+  const token = String(req.query.token || '').trim();
+  const force = (req.query.force === '1' || req.query.force === 'true');
+  const wipe  = (req.query.wipe  === '1' || req.query.wipe  === 'true');
+
+  if (force) {
+    await destroyClient(t, { wipe });
+    makeClient(t);
+  }
+
+  const html =
+    '<html><body style="font-family: sans-serif">' +
+    '<h3>Scan with WhatsApp (' + t.replace(/</g, '&lt;') + ')</h3>' +
+    '<div id="loading" style="margin:8px 0 16px 0;font-size:18px">Loading QR. Please wait...</div>' +
+    '<div id="qr"></div>' +
+    '<script>' +
+    '  const token=' + JSON.stringify(token) + ', tenant=' + JSON.stringify(t) + ';' +
+    '  const loading = document.getElementById("loading");' +
+    '  const qrEl = document.getElementById("qr");' +
+    '  const img = document.createElement("img");' +
+    '  img.id = "qri"; img.style.maxWidth = "360px"; img.style.width = "100%"; img.alt = "QR";' +
+    '  img.onload = function(){ if (loading) loading.textContent = ""; };' +
+    '  img.onerror = function(){};' +
+    '  qrEl.appendChild(img);' +
+    '  let lastFetchTs = 0;' +
+    '  function refreshQR(){' +
+    '    const now = Date.now();' +
+    '    if (now - lastFetchTs < 2000) return;' +
+    '    img.src = "/qr-img.png?tenant=" + encodeURIComponent(tenant) +' +
+    '             "&token=" + encodeURIComponent(token) +' +
+    '             "&ts=" + now;' +
+    '    lastFetchTs = now;' +
+    '  }' +
+    '  async function pollStatus(){' +
+    '    try {' +
+    '      const r = await fetch("/status?tenant="+encodeURIComponent(tenant)+"&token="+encodeURIComponent(token));' +
+    '      const d = await r.json();' +
+    '      if (d.clientReady) { qrEl.innerHTML = "<h3>WhatsApp instance activated.</h3>"; return true; }' +
+    '      if (d.lastQr) refreshQR();' +
+    '    } catch (e) {}' +
+    '    return false;' +
+    '  }' +
+    '  refreshQR();' +
+    '  (async function loop(){ if (await pollStatus()) return; setTimeout(loop, 1200); })();' +
+    '</script>' +
+    '</body></html>';
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.end(html);
 });
 
 function normalizeToWhatsAppId(to){
-  const digits=String(to).replace(/\D/g,'');
+  const digits = String(to).replace(/\D/g,'');
   if(!digits) throw new Error('Empty phone');
-  return `${digits}@c.us`;
+  return digits + '@c.us';
 }
 
 app.post('/send', async (req, res) => {
@@ -439,11 +579,11 @@ app.post('/send', async (req, res) => {
 
     return res.json({ tenant, to, results, corr });
   }catch(e){
-    return res.status(500).json({ error:'Send failed', detail:String(e?.message || e), corr });
+    return res.status(500).json({ error:'Send failed', detail:String(e && e.message || e), corr });
   }
 });
 
-app.listen(PORT, () => logger.info(`whatsapp-bridge listening on :${PORT}`));
+app.listen(PORT, () => logger.info('whatsapp-bridge listening on :' + PORT));
 """
 
 def _compose_yaml(project_name: str, container_name: str, bind_host: str, host_port: int,
@@ -475,10 +615,6 @@ services:
 # Settings (no password reads)
 # =============================
 def _ensure_settings_defaults_once():
-    """
-    Seed Singles with sensible defaults (only-if-blank).
-    No reading of password fields here.
-    """
     s = frappe.get_single("WhatsApp Bridge Settings")
 
     if not s.get("tenant_id"):
@@ -494,7 +630,6 @@ def _ensure_settings_defaults_once():
     if s.get("allowed_hosts") is None: s.allowed_hosts = ""
     if s.get("trust_proxy")   is None: s.trust_proxy   = 1  # behind nginx by default
 
-    # Internal URL will be corrected later once we finalize host_port
     if not s.get("bridge_url"):
         s.bridge_url = f"http://{DEFAULT_BIND_HOST}:{int(s.expose_port)}/send"
 
@@ -507,12 +642,7 @@ def _ensure_settings_defaults_once():
 def _compose_path(docker_root: str) -> str:
     return os.path.join(docker_root, "docker-compose.yml")
 
-def _extract_token_from_compose(compose_text: str, tenant_id: string) -> str | None:
-    """
-    Read TENANT_TOKENS line and pull token for the given tenant.
-    Example line:
-      - TENANT_TOKENS=sales:abc,ops:def
-    """
+def _extract_token_from_compose(compose_text: str, tenant_id: str) -> str | None:
     m = re.search(r"^\s*-\s*TENANT_TOKENS=([^\r\n]+)$", compose_text, flags=re.MULTILINE)
     if not m:
         return None
@@ -526,11 +656,6 @@ def _extract_token_from_compose(compose_text: str, tenant_id: string) -> str | N
     return None
 
 def _ensure_primary_token_for_site(s, docker_root: str) -> str:
-    """
-    Rules:
-    - If docker-compose.yml exists and contains a token for s.tenant_id, reuse it (no Password reads).
-    - Else generate a new one, set in Singles via frappe.db.set_value, return it.
-    """
     compose_file = _compose_path(docker_root)
     tenant_id = (s.tenant_id or DEFAULT_TENANT_ID).strip()
     if os.path.exists(compose_file):
@@ -543,7 +668,6 @@ def _ensure_primary_token_for_site(s, docker_root: str) -> str:
         except Exception:
             pass
 
-    # Generate new token (install-time) and write to Singles without reading it
     token_plain = secrets.token_urlsafe(32)
     frappe.db.set_value("WhatsApp Bridge Settings", "WhatsApp Bridge Settings", "bridge_token", token_plain)
     try:
@@ -553,10 +677,6 @@ def _ensure_primary_token_for_site(s, docker_root: str) -> str:
     return token_plain
 
 def _tenant_tokens_env(primary_tenant: str, primary_token: str, s) -> str:
-    """
-    Build TENANT_TOKENS value without reading any password fields.
-    Includes optional plain extra entries from s.multi_tenant_tokens (Data).
-    """
     mapping = {primary_tenant: primary_token}
     extra = (s.get("multi_tenant_tokens") or "").strip()
     if extra:
@@ -566,11 +686,9 @@ def _tenant_tokens_env(primary_tenant: str, primary_token: str, s) -> str:
                 continue
             t, tok = p.split(":", 1)
             t, tok = t.strip(), tok.strip()
-            # ignore obviously masked values like "********"
             if not tok or set(tok) == {"*"}:
                 continue
             mapping[t] = tok
-    # stable order
     return ",".join(f"{t}:{mapping[t]}" for t in sorted(mapping.keys()))
 
 # =============================
@@ -583,7 +701,6 @@ def _bench_root_and_name() -> tuple[str, str]:
         if (cur / "sites").is_dir() and (cur / "apps").is_dir():
             return str(cur), cur.name
         cur = cur.parent
-    # fallback
     try:
         bench_root = app_path.parents[2]
     except IndexError:
@@ -686,7 +803,7 @@ server {{
     listen {bind_ip}:{listen_port} ssl;
     server_name {server_name};
 
-    {chr(10).join("    " + l for l in tls_lines)}
+    {'\\n    '.join(tls_lines)}
 
     client_max_body_size 25m;
 
@@ -699,9 +816,12 @@ server {{
     proxy_read_timeout 60s;
     proxy_buffering off;
 
-    location = /qr     {{ proxy_pass http://{upstream_host}:{upstream_port}/qr; }}
-    location = /status {{ proxy_pass http://{upstream_host}:{upstream_port}/status; }}
-    location = /health {{ proxy_pass http://{upstream_host}:{upstream_port}/health; }}
+    location = /qr          {{ proxy_pass http://{upstream_host}:{upstream_port}/qr; }}
+    location = /status      {{ proxy_pass http://{upstream_host}:{upstream_port}/status; }}
+    location = /health      {{ proxy_pass http://{upstream_host}:{upstream_port}/health; }}
+    location = /qr-img      {{ proxy_pass http://{upstream_host}:{upstream_port}/qr-img; }}
+    location = /qr-img.png  {{ proxy_pass http://{upstream_host}:{upstream_port}/qr-img.png; }}
+    location = /reinit      {{ proxy_pass http://{upstream_host}:{upstream_port}/reinit; }}
 
     location ^~ /send  {{ return 403; }}
     location /         {{ return 404; }}
@@ -724,7 +844,8 @@ def _nginx_reload():
 # =============================
 def _port_in_use(host: str, port: int) -> bool:
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        import socket as _s
+        with _s.socket(_s.AF_INET, _s.SOCK_STREAM) as s:
             s.settimeout(0.4)
             return s.connect_ex((host, port)) == 0
     except Exception:
@@ -813,7 +934,7 @@ def run_after_install():
         # 3) per-site project root
         docker_root = _ensure_project_root_for_site(site)
 
-        # 4) Stop any existing stack first (so port test isn't confused)
+        # 4) Stop any existing stack first
         try:
             _compose(docker_root, ["down"])
         except Exception:
@@ -831,7 +952,7 @@ def run_after_install():
                 s.save(ignore_permissions=True)
                 frappe.msgprint(f"Port {old} is busy; using {host_port} for site {site}.")
 
-        # 6) Token: generate at install-time (or reuse from compose), and write to Singles via db.set_value
+        # 6) Token (no password reads): reuse from compose or generate + save
         primary_token = _ensure_primary_token_for_site(s, docker_root)
         tenant_tokens_env = _tenant_tokens_env(s.tenant_id, primary_token, s)
 
@@ -862,7 +983,7 @@ def run_after_install():
 
         # 9) Nginx vhost (shared public port 3001, SNI via server_name)
         bench_root, bench_name = _bench_root_and_name()
-        bench_conf = _bench_nginx_conf_path(bench_name)
+        bench_conf = os.path.join(NGINX_CONF_DIR, f"{bench_name}.conf")
         cert_info = _extract_cert_block_for_site(bench_conf, site)
         if cert_info:
             bind_ip = _detect_public_ip()
@@ -870,7 +991,7 @@ def run_after_install():
                 site=site,
                 bind_ip=bind_ip,
                 listen_port=PUBLIC_TLS_PORT,      # shared public port across sites
-                server_name=cert_info["server_name"],
+                server_name=slug,
                 cert=cert_info["ssl_certificate"],
                 key=cert_info["ssl_certificate_key"],
                 include_options=cert_info.get("include_options"),
