@@ -93,7 +93,7 @@ after_install = "whatsapp_bridge.after_install.run_after_install"
 # Uninstallation
 # ------------
 
-# before_uninstall = "whatsapp_bridge.uninstall.before_uninstall"
+before_uninstall = "whatsapp_bridge.uninstall.before_uninstall"
 # after_uninstall = "whatsapp_bridge.uninstall.after_uninstall"
 
 # Integration Setup
