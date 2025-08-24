@@ -16,6 +16,16 @@ class WhatsAppBridgeSettings(Document):
             frappe.log_error(frappe.get_traceback(), "WhatsApp Bridge: apply on_update failed")
             frappe.msgprint("Could not restart the bridge automatically. Check 'WhatsApp Bridge' error logs.")
 
+
+    @frappe.whitelist()
+    def get_token(self):
+        """
+        Generate a new token for the bridge.
+        """
+
+        token = self.get_password(fieldname="bridge_token", raise_exception=False)
+        return token
+
 def _base_url_from_send(send_url: str) -> str:
     if not send_url:
         return ""
